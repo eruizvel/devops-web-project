@@ -28,10 +28,14 @@ pipeline {
 
         stage('Cleanup old container') {
     steps {
-        echo 'Forcefully removing any existing container named devops-web-project-server...'
+        echo 'Checking and removing old container if it exists...'
         sh '''
-            if [ $(docker ps -a -q -f name=devops-web-project-server | wc -l) -gt 0 ]; then
-                docker rm -f devops-web-project-server
+            CONTAINER_ID=$(docker ps -aqf "name=devops-web-project-server")
+            if [ -n "$CONTAINER_ID" ]; then
+                echo "Removing existing container $CONTAINER_ID"
+                docker rm -f $CONTAINER_ID
+            else
+                echo "No existing container found."
             fi
         '''
             }
