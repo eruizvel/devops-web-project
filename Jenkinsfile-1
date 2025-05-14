@@ -1,7 +1,7 @@
 pipeline {
     agent {
         node {
-            label 'dockerhost-build-server'
+        label 'dockerhost-build-server'
         }
     }
     tools {
@@ -9,51 +9,43 @@ pipeline {
     }
     environment {
         DOCKERHUB_CREDENTIALS = credentials('devops-dockerhub-token')
-        DOCKER_USER = 'eruizvel'
     }
     stages {
         stage('Packaging') {
             steps {
-                echo 'Packaging WAR file with Maven...'
+                echo 'Packaging..'
                 sh 'mvn clean package'
             }
         }
-
-        stage('Copying WAR file') {
+        stage('Copying war file') {
             steps {
-                echo 'Copying WAR file to workspace root...'
+                echo 'Copying war file..'
                 sh 'mv target/*.war .'
             }
         }
-
-        stage('Cleanup old container') {
-    steps {
-        echo 'Checking and removing old container if it exists...'
-        sh '''
-            CONTAINER_ID=$(docker ps -aqf "name=devops-web-project-server")
-            if [ -n "$CONTAINER_ID" ]; then
-                echo "Removing existing container $CONTAINER_ID"
-                docker rm -f $CONTAINER_ID
-            else
-                echo "No existing container found."
-            fi
-        '''
-            }
+        stage('build image') {
+          steps {
+            sh 'docker build -t eruizvel/devops-web-project:v1 --label devops-web-project-server .'
+          }
         }
-
-        stage('Build Docker image') {
+        stage('Docker Hub Login') {
             steps {
-                echo 'Building Docker image...'
-                sh 'docker build -t ${DOCKER_USER}/devops-web-project:v1 --label devops-web-project-server .'
-            }
-        }
-
-        stage('Login to Docker Hub') {
-            steps {
-                echo 'Authenticating to Docker Hub...'
                 sh 'echo $DOCKERHUB_CREDENTIALS_PSW | docker login -u $DOCKERHUB_CREDENTIALS_USR --password-stdin'
             }
         }
+        stage('Push to Docker Hub') {
+          steps {
+            sh 'docker push eruizvel/devops-web-project:v1'
+          }
+        }
+    }
+    post {
+        always {
+            sh 'docker logout'
+        }
+    }
+  }
+
 
         stage('Push image to Docker Hub') {
             steps {
