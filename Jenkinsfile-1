@@ -27,9 +27,13 @@ pipeline {
         }
 
         stage('Cleanup old container') {
-            steps {
-                echo 'Removing old container if it exists...'
-                sh 'docker rm -f devops-web-project-server || true'
+    steps {
+        echo 'Forcefully removing any existing container named devops-web-project-server...'
+        sh '''
+            if [ $(docker ps -a -q -f name=devops-web-project-server | wc -l) -gt 0 ]; then
+                docker rm -f devops-web-project-server
+            fi
+        '''
             }
         }
 
