@@ -1,7 +1,7 @@
 pipeline {
     agent {
         node {
-        label 'dockerhost-build-server'
+            label 'dockerhost-build-server'
         }
     }
     tools {
@@ -9,39 +9,63 @@ pipeline {
     }
     environment {
         DOCKERHUB_CREDENTIALS = credentials('devops-dockerhub-token')
+        DOCKER_USER = 'eruizvel'
     }
     stages {
         stage('Packaging') {
             steps {
-                echo 'Packaging..'
+                echo 'Packaging WAR file with Maven...'
                 sh 'mvn clean package'
             }
         }
-        stage('Copying war file') {
+
+        stage('Copying WAR file') {
             steps {
-                echo 'Copying war file..'
+                echo 'Copying WAR file to workspace root...'
                 sh 'mv target/*.war .'
             }
         }
-        stage('build image') {
-          steps {
-            sh 'docker build -t eruizvel/devops-web-project:v1 --label devops-web-project-server .'
-          }
-        }
-        stage('Docker Hub Login') {
+
+        stage('Cleanup old container') {
             steps {
+                echo 'Removing old container if it exists...'
+                sh 'docker rm -f devops-web-project-server || true'
+            }
+        }
+
+        stage('Build Docker image') {
+            steps {
+                echo 'Building Docker image...'
+                sh 'docker build -t ${DOCKER_USER}/devops-web-project:v1 --label devops-web-project-server .'
+            }
+        }
+
+        stage('Login to Docker Hub') {
+            steps {
+                echo 'Authenticating to Docker Hub...'
                 sh 'echo $DOCKERHUB_CREDENTIALS_PSW | docker login -u $DOCKERHUB_CREDENTIALS_USR --password-stdin'
             }
         }
-        stage('Push to Docker Hub') {
-          steps {
-            sh 'docker push eruizvel/devops-web-project:v1'
-          }
+
+        stage('Push image to Docker Hub') {
+            steps {
+                echo 'Pushing image to Docker Hub...'
+                sh 'docker push ${DOCKER_USER}/devops-web-project:v1'
+            }
+        }
+
+        stage('Run Docker container') {
+            steps {
+                echo 'Running Docker container on port 8081...'
+                sh 'docker run -d --name devops-web-project-server --label devops-web-project-server -p 8081:8080 ${DOCKER_USER}/devops-web-project:v1'
+            }
         }
     }
+
     post {
         always {
+            echo 'Cleaning up Docker login session...'
             sh 'docker logout'
         }
     }
-  }
+}
